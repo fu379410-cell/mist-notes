@@ -37,7 +37,7 @@ function selfTest() {
 }
 selfTest();
 if (process.argv.includes('--self-test')) { console.log('Security scanner fixture checks passed.'); process.exit(0); }
-assert.equal(git(['rev-parse', '--show-toplevel']).toString().trim(), root, 'Run only inside the independent project repository.');
+assert.equal(resolve(git(['rev-parse', '--show-toplevel']).toString().trim()), root, 'Run only inside the independent project repository.');
 const paths = [...new Set(git(['ls-files', '--cached', '--others', '--exclude-standard', '-z']).toString().split('\0').filter(Boolean))];
 const findings = [];
 let filesScanned = 0;
