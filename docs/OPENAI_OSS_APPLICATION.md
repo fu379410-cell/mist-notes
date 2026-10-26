@@ -23,7 +23,7 @@ Short notes often need readable typography and lightweight organization without 
 
 ## 4. Open Source Contribution
 
-Current tangible work includes application source, regression tests, pinned dependencies, third-party notices, build scripts, a privacy-focused source-selection process, and proposed cross-platform CI and draft-release workflows. The exact local verification results are recorded in [VERIFICATION.md](VERIFICATION.md).
+Current tangible work includes application source, regression tests, pinned dependencies, third-party notices, build scripts, a privacy-focused source-selection process, and configured cross-platform CI and draft-release workflows. The exact local verification results are recorded in [VERIFICATION.md](VERIFICATION.md).
 
 **Approved:** MIT licensing and publication of the reviewed project-owned source and runtime assets. **Not yet established:** public release history, externally merged pull requests, downstream reuse, or independently confirmed ecosystem adoption. No stars, downloads, user counts, or contributor counts are asserted.
 
@@ -59,7 +59,7 @@ The [official Program Terms](https://learn.chatgpt.com/docs/codex-for-oss-terms)
 | --- | --- | --- |
 | Open license and asset rights | Owner approved MIT and the reviewed public scope on 2026-10-26 | Preserve the root MIT notice and third-party rights; keep unverified font outlines excluded |
 | Public repository/control | Public [https://github.com/fu379410-cell/mist-notes](https://github.com/fu379410-cell/mist-notes); publishing account verified with ADMIN access | Keep source/default-branch and actual CI evidence current |
-| Active maintenance | Local iteration exists; public history absent | Publish truthful commits and track subsequent fixes; do not backdate history |
+| Active maintenance | Initial public commits exist; sustained public maintenance is not yet established | Track subsequent real fixes and community review; do not backdate history |
 | Technical quality | Local tests/build and source review available | Publish evidence, then let actual CI and device tests establish their results |
 | Usage/ecosystem importance | No verified public evidence | Gather voluntary real feedback and downstream use over time |
 | Applicant information | Must be supplied/verified by the applicant | Confirm valid ChatGPT account, actual maintainer responsibilities and repository permissions |

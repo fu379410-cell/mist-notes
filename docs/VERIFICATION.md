@@ -29,6 +29,12 @@
 - 本轮没有正式发行签名、Apple 公证、自动更新、公开 Release、下载量或用户统计。
 - 所有者已于 2026-10-26 确认 MIT + Public、六个运行图标和合成内容截图的授权范围；公开授权和实际仓库状态分别记录，CI 状态见 [Actions](https://github.com/fu379410-cell/mist-notes/actions)，没有将配置存在写成运行通过。
 
+## 首次源码发布核验
+
+2026-10-26 已通过 GitHub API 核实仓库 `fu379410-cell/mist-notes` 为 Public、MIT，默认分支为 `main`，发布账号拥有 ADMIN 权限。首次源码发布的提交 `5449b7ad234589a5d6437c408c0446351ee23901` 包含 98 个文件，逐个 Git blob SHA 与本地提交一致；README、英文说明、LICENSE、申请文档及合成截图另做字节比对。
+
+提交后的安全扫描覆盖 2 个可达提交和 99 个历史 blob，无发现；没有发布个人便签、密钥、旧备份或安装器。上述提交标识用于固定该次核验，后续文档提交和 CI 以 [Actions](https://github.com/fu379410-cell/mist-notes/actions) 的实际记录为准，本文没有预先宣布 CI 通过。
+
 ## 发布后必须补核
 
 核对真实远程 URL、仓库可见性、README/文件清单、默认分支、首轮 CI、LICENSE/素材授权和实际 tag；再决定是否运行四包构建、创建 Draft Release。设备验收与公开草稿转正式 Release 分别记录。
