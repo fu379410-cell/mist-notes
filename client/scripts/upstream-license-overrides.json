@@ -1,0 +1,8 @@
+{
+  "boolbase@1.0.0": {
+    "file": "upstream-licenses/boolbase-1.0.0-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/fb55/boolbase/54811f01c797a6bb1c263183ae90b7dd627e0638/LICENSE",
+    "sha256": "cdf4d87ae0a6c160227263bf4e39a0a10e30e89ae7256e0f7ac7bde0836552c6",
+    "reason": "The npm v1.0.0 archive declares ISC but omits the standalone license; preserved from the same official upstream repository."
+  }
+}

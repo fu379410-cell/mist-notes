@@ -1,0 +1,204 @@
+name: Build desktop installers
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag (optional for artifact-only builds)
+        required: false
+        type: string
+      publish_draft:
+        description: Create a draft GitHub release for the existing tag
+        required: true
+        default: false
+        type: boolean
+
+# Tag pushes and ordinary manual runs only build Actions artifacts.
+# Only an explicit manual publish_draft request can create a draft release.
+permissions:
+  contents: read
+
+concurrency:
+  group: installers-${{ github.ref }}-${{ inputs.tag || 'current' }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      tag: ${{ steps.metadata.outputs.tag }}
+      source_sha: ${{ steps.metadata.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Validate version, source tag and draft prerequisites
+        id: metadata
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+          PUBLISH_DRAFT: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_draft }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync, existsSync, appendFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const pkg = JSON.parse(readFileSync('client/package.json', 'utf8'));
+          assert.match(pkg.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/);
+          const tag = process.env.REQUESTED_TAG || '';
+          const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (tag) {
+            assert.equal(tag, `v${pkg.version}`, 'Tag must match package version');
+            const tagged = execFileSync('git', ['rev-parse', `refs/tags/${tag}^{commit}`], { encoding: 'utf8' }).trim();
+            assert.equal(tagged, source, 'Tag must point to the checked-out source');
+          }
+          if (process.env.PUBLISH_DRAFT === 'true') {
+            assert.ok(tag, 'Draft publication requires an existing version tag');
+            assert.ok(existsSync('LICENSE') && readFileSync('LICENSE', 'utf8').trim(), 'A confirmed root LICENSE is required');
+            assert.ok(typeof pkg.license === 'string' && pkg.license && pkg.license !== 'UNLICENSED', 'Confirm the package license first');
+            assert.equal(JSON.parse(readFileSync('docs/asset-provenance.json', 'utf8')).publicRedistributionApproved, true, 'Runtime asset redistribution must be approved by the owner');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${pkg.version}\ntag=${tag}\nsource_sha=${source}\n`);
+          NODE
+
+  build:
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: mac-arm64
+            builder_args: --mac dmg --arm64
+            app: release/mac-arm64/雾笺.app
+            arch: arm64
+          - os: macos-latest
+            target: mac-x64
+            builder_args: --mac dmg --x64
+            app: release/mac/雾笺.app
+            arch: x64
+          - os: windows-latest
+            target: windows-x64
+            builder_args: --win nsis portable --x64
+            app: release/win-unpacked
+            arch: x64
+    defaults:
+      run:
+        shell: bash
+        working-directory: client
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run licenses:check
+      - run: npm audit --audit-level=high
+      - run: npm run build
+      - run: npm run security:scan
+      - name: Build test-signed installers without publishing
+        run: npx --no-install electron-builder ${{ matrix.builder_args }} --publish never
+      - name: Check unpacked app against frozen build
+        run: node scripts/verify-built-app.mjs --app "${{ matrix.app }}" --arch "${{ matrix.arch }}" --report "release/verification-${{ matrix.target }}.json"
+      - name: Write installer checksums
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+          const files = readdirSync('release').filter(name => /\.(dmg|exe)$/.test(name)).sort();
+          if (!files.length) throw new Error('No installer was produced');
+          const lines = files.map(name => `${createHash('sha256').update(readFileSync(`release/${name}`)).digest('hex')}  ${name}\n`).join('');
+          writeFileSync(`release/SHA256SUMS-${process.env.TARGET}.txt`, lines);
+          NODE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            client/release/*.dmg
+            client/release/*.exe
+            client/release/SHA256SUMS-*.txt
+            client/release/verification-*.json
+
+  draft:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_draft
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: artifacts
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Recheck license, version and downloaded checksums
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('client/package.json', 'utf8'));
+          assert.equal(process.env.RELEASE_TAG, `v${pkg.version}`);
+          assert.ok(existsSync('LICENSE') && readFileSync('LICENSE', 'utf8').trim());
+          assert.ok(pkg.license && pkg.license !== 'UNLICENSED');
+          assert.equal(JSON.parse(readFileSync('docs/asset-provenance.json', 'utf8')).publicRedistributionApproved, true);
+          const names = readdirSync('artifacts');
+          const expected = new Map();
+          for (const name of names.filter(name => /^SHA256SUMS-.*\.txt$/.test(name))) {
+            for (const line of readFileSync(`artifacts/${name}`, 'utf8').trim().split('\n')) {
+              const match = line.match(/^([a-f0-9]{64})  ([^/\\]+)$/);
+              assert.ok(match && !expected.has(match[2]), 'Invalid or duplicate installer checksum');
+              expected.set(match[2], match[1]);
+            }
+          }
+          const installers = names.filter(name => /\.(dmg|exe)$/.test(name)).sort();
+          assert.equal(installers.length, 4);
+          assert.equal(expected.size, installers.length);
+          for (const name of installers) assert.equal(createHash('sha256').update(readFileSync(`artifacts/${name}`)).digest('hex'), expected.get(name));
+          writeFileSync('artifacts/SHA256SUMS.txt', installers.map(name => `${expected.get(name)}  ${name}\n`).join(''));
+          writeFileSync('release-notes.md', 'Test client build. macOS uses ad-hoc signing; Windows is unsigned. Static package checks do not replace installation, input-method, multi-monitor or display-scaling checks. No personal notes or AI keys are included.\n');
+          NODE
+      - name: Create draft release only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          gh release create "$RELEASE_TAG" artifacts/*.dmg artifacts/*.exe artifacts/SHA256SUMS.txt artifacts/verification-*.json \
+            --draft --verify-tag --target "$SOURCE_SHA" --title "雾笺 $RELEASE_TAG" --notes-file release-notes.md

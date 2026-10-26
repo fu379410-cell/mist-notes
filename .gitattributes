@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.png binary
+*.icns binary
+*.ico binary
+
+# Preserve upstream license text exactly, including upstream whitespace.
+THIRD_PARTY_LICENSES.txt -whitespace

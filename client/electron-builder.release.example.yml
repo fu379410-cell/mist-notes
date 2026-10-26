@@ -1,0 +1,23 @@
+# Review-only formal-release template. Never used by the beta package scripts.
+# Copy this file to a private release configuration and replace all REPLACE_* values.
+# Supply signing / notarization credentials through the environment or keychain only.
+extends: ./electron-builder.yml
+forceCodeSigning: true
+directories:
+  output: release-signed
+mac:
+  identity: "Developer ID Application: REPLACE_WITH_LEGAL_PUBLISHER (TEAMID0000)"
+  hardenedRuntime: true
+  notarize: true
+  # Locked electron-builder 26.17.0 uses this same bundled template for the app
+  # and its non-MAS child processes. Includes allow-jit for Apple Silicon.
+  entitlements: node_modules/app-builder-lib/templates/entitlements.mac.plist
+  entitlementsInherit: node_modules/app-builder-lib/templates/entitlements.mac.plist
+win:
+  signExecutable: true
+  signtoolOptions:
+    publisherName: "REPLACE_WITH_EXACT_CERTIFICATE_PUBLISHER"
+    signingHashAlgorithms: [sha256]
+    rfc3161TimeStampServer: http://timestamp.digicert.com
+# No certificateFile, certificatePassword, API key or password belongs in this file.
+publish: null

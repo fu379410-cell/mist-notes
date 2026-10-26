@@ -1,0 +1,18 @@
+.dynamic-background {
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  overflow:hidden;
+  pointer-events:none;
+  user-select:none;
+  contain:paint;
+}
+.dynamic-gradient-base,.dynamic-reading-layer { position:absolute; inset:0; }
+.dynamic-gradient-layer {
+  position:absolute;
+  inset:0;
+  opacity:0;
+  will-change:opacity;
+}
+/* Only full-window linear gradients crossfade. No translated pools, masks,
+   radial lights, blur or brightness animation. WAAPI owns one shared clock. */

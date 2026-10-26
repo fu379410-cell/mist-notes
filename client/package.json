@@ -1,0 +1,57 @@
+{
+  "name": "mist-notes-desktop",
+  "productName": "雾笺",
+  "version": "2.1.0-beta.6",
+  "description": "Local-first desktop sticky notes with accessible animated gradients and optional one-click AI organization",
+  "private": true,
+  "author": "雾笺",
+  "license": "MIT",
+  "main": "dist-electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build:electron && concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env MIST_DEV_URL=http://127.0.0.1:5173 electron .\"",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build": "npm run typecheck && vite build && npm run build:electron",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "package:mac": "npm run build && electron-builder --mac dmg --arm64 --x64 --publish never",
+    "package:windows": "npm run build && electron-builder --win nsis portable --x64 --publish never",
+    "package:dir": "npm run build && electron-builder --dir --publish never",
+    "security:scan": "node scripts/security-scan.mjs",
+    "licenses:generate": "node scripts/third-party-notices.mjs",
+    "licenses:check": "node scripts/third-party-notices.mjs --check",
+    "verify:package": "node scripts/verify-built-app.mjs"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.32.0",
+    "@tiptap/extension-placeholder": "3.32.0",
+    "@tiptap/extension-text-style": "3.32.0",
+    "@tiptap/react": "3.32.0",
+    "@tiptap/starter-kit": "3.32.0",
+    "cheerio": "1.2.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "@tiptap/pm": "3.32.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "concurrently": "10.0.6",
+    "cross-env": "10.1.0",
+    "electron": "44.9.1",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "wait-on": "9.5.1",
+    "domhandler": "5.0.3",
+    "@electron/asar": "3.4.1"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

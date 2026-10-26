@@ -1,0 +1,30 @@
+name: Bug report / 问题报告
+description: 报告可复现的客户端问题
+body:
+  - type: markdown
+    attributes:
+      value: 不要提交 API Key、私人便签或未脱敏导出。安全漏洞请先阅读 SECURITY.md。
+  - type: input
+    id: version
+    attributes:
+      label: 雾笺版本
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: 系统、版本与架构
+      placeholder: macOS / Windows，arm64 / x64
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 最小复现步骤
+      description: 使用合成文字描述，说明预期和实际结果。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏日志或截图（可选）

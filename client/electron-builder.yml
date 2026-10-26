@@ -1,0 +1,75 @@
+appId: local.mistnotes.desktop.v2
+productName: 雾笺
+copyright: Copyright © 2026 雾笺
+asar: true
+npmRebuild: false
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+  - "!**/*.map"
+extraResources:
+  - from: ../THIRD_PARTY_LICENSES.txt
+    to: licenses/THIRD_PARTY_LICENSES.txt
+  - from: ../THIRD_PARTY_NOTICES.md
+    to: licenses/THIRD_PARTY_NOTICES.md
+  - from: node_modules/electron/dist/LICENSE
+    to: licenses/Electron-LICENSE
+  - from: node_modules/electron/dist/LICENSES.chromium.html
+    to: licenses/Chromium-LICENSES.html
+  - from: ..
+    to: licenses
+    filter:
+      - LICENSE
+  - from: resources
+    to: branding
+    filter:
+      - trayTemplate.png
+      - trayTemplate@2x.png
+      - icon.png
+mac:
+  category: public.app-category.productivity
+  icon: resources/icon.icns
+  identity: "-"
+  hardenedRuntime: false
+  notarize: false
+  minimumSystemVersion: "13.0"
+  artifactName: MistNotes-${version}-mac-${arch}.${ext}
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+dmg:
+  title: 雾笺 ${version}
+  sign: false
+  contents:
+    - x: 130
+      y: 170
+      type: file
+    - x: 410
+      y: 170
+      type: link
+      path: /Applications
+win:
+  icon: resources/icon.ico
+  signAndEditExecutable: true
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+nsis:
+  artifactName: MistNotes-${version}-windows-${arch}-setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: 雾笺
+  deleteAppDataOnUninstall: false
+  installerLanguages: [zh_CN, en_US]
+portable:
+  artifactName: MistNotes-${version}-windows-${arch}-portable.${ext}
+publish: null

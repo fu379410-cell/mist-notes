@@ -1,0 +1,42 @@
+{
+  "generator": "OpenAI image_gen (historical local generation records reviewed)",
+  "publicAssetPermission": "Project owner confirmed MIT + Public for the listed original runtime assets and synthetic demonstration screenshot on 2026-10-26.",
+  "files": [
+    {
+      "path": "client/resources/icon.png",
+      "role": "full-bleed application icon",
+      "sha256": "9ad80b0027bf1b1fb7fde9a27864cae075d401f4ee4e3cba78b8d08ffe04118c"
+    },
+    {
+      "path": "client/resources/icon.icns",
+      "role": "macOS icon container",
+      "sha256": "e7736ffbefe66dc256f6ddd3f2f64ccaa66143b84c685bbf15698e7364a96024"
+    },
+    {
+      "path": "client/resources/icon.ico",
+      "role": "Windows icon container",
+      "sha256": "7a8c2a1fad9981cd28c9de0d6bac1b99bd5ecffcf00b35f5401b3b0676a86d92"
+    },
+    {
+      "path": "client/resources/brand-mark.png",
+      "role": "transparent in-app mark",
+      "sha256": "ae2d4c78bdfbaa878297eebfda2e16bfac1c6a4796527cb02af3288d8dfcfe3e"
+    },
+    {
+      "path": "client/resources/trayTemplate.png",
+      "role": "monochrome tray adaptation",
+      "sha256": "6db6e6aefe8dbb77e9d89a9a9355a6bfb05bfd2f4670c8577558426945851bf5"
+    },
+    {
+      "path": "client/resources/trayTemplate@2x.png",
+      "role": "retina monochrome tray adaptation",
+      "sha256": "8fe9486a81750e1694e0ce9e995af008351a4ade8eb1d60699c2cd5ee5fcb6a3"
+    }
+  ],
+  "excluded": "Historical drafts, machine-specific generation paths, PingFang outlined wordmark/lockup and previews are not included.",
+  "limitation": "Generation provenance is not a guarantee of copyright exclusivity, trademark clearance, or rights in every input.",
+  "publicRedistributionApproved": true,
+  "license": "MIT",
+  "approvalDate": "2026-10-26",
+  "screenshot": "docs/screenshots/macos-demo.png; synthetic content only; OS UI elements retain their respective rights"
+}
