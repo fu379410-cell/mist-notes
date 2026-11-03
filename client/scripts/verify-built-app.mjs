@@ -34,7 +34,7 @@ function walk(path) {
 
 assert.ok(existsSync(asar), 'Build an unpacked application before checking it');
 const entries = listPackage(asar).filter(name => !('files' in statFile(asar, name.replace(/^\//, ''))));
-const forbiddenFiles = entries.filter(name => /(?:^|\/)(?:notes(?:\.previous)?\.json|ai-credentials\.json|\.env(?:\.[^/]*)?|[^/]+\.(?:key|p12|pfx)|backups?|qa-v2|verification|userData)(?:\/|$)/i.test(name));
+const forbiddenFiles = entries.filter(name => /(?:^|\/)(?:notes(?:\.previous)?\.json|capsules(?:\.previous)?\.v1\.json|ai-credentials\.json|\.env(?:\.[^/]*)?|[^/]+\.(?:key|p12|pfx)|backups?|qa-v2|verification|userData)(?:\/|$)/i.test(name));
 assert.deepEqual(forbiddenFiles, [], 'A private-data path was included in app.asar');
 const packaged = JSON.parse(extractFile(asar, 'package.json').toString('utf8'));
 assert.equal(packaged.version, sourcePackage.version, 'Packaged version differs from source');

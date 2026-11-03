@@ -46,6 +46,9 @@ export interface AppState {
   version: string;
   loginEnabled: boolean;
   migrationMessage?: string;
+  windowMode?: 'note' | 'capsule' | 'preview';
+  capsuleEdge?: 'left' | 'right' | 'top' | 'bottom';
+  capsuleEnabled?: boolean;
 }
 export type NotePatch = Partial<Pick<Note, 'title' | 'text' | 'editorDoc' | 'bodyFontSize' | 'titleFontSize' | 'theme' | 'pinned'>>;
 export type SettingsPatch = Partial<NotebookSettings>;
@@ -62,6 +65,12 @@ export interface MistAPI {
   resizeStart(position: PointerPosition): Promise<void>;
   resizeMove(position: PointerPosition): Promise<void>;
   resizeEnd(): Promise<void>;
+  dragStart(position: PointerPosition): Promise<void>;
+  dragMove(position: PointerPosition): Promise<void>;
+  dragEnd(cancelled?: boolean): Promise<void>;
+  previewCapsule(expanded: boolean): Promise<void>;
+  restoreFromCapsule(): Promise<void>;
+  setCapsuleEnabled(enabled: boolean): Promise<void>;
   minimize(): Promise<void>;
   close(): Promise<void>;
   setLogin(enabled: boolean): Promise<boolean>;

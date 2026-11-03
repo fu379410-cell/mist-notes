@@ -1,0 +1,199 @@
+.capsule-host {
+  width:100%;
+  height:100%;
+  padding:4px;
+  background:transparent;
+  user-select:none;
+  -webkit-app-region:no-drag;
+  -webkit-font-smoothing:antialiased;
+}
+.capsule-card {
+  --capsule-radius:24px;
+  position:relative;
+  isolation:isolate;
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  border:1px solid #ffffff58;
+  border-radius:var(--capsule-radius);
+  box-shadow:0 1px 3px #1c243625,inset 0 1px 0 #ffffff52;
+}
+.capsule-card > .dynamic-background { border-radius:inherit; }
+.capsule-card::before,.capsule-card::after {
+  position:absolute;
+  z-index:2;
+  pointer-events:none;
+  content:"";
+  border-radius:inherit;
+}
+/* A softened outer rim and an inset etched line keep the edge fine at 1x/2x. */
+.capsule-card::before { inset:0; border:1px solid #ffffff45; filter:blur(.25px); }
+.capsule-card::after {
+  inset:2px;
+  border:1px solid color-mix(in srgb,currentColor 10%,transparent);
+  border-radius:calc(var(--capsule-radius) - 3px);
+}
+.capsule-card.is-preview { --capsule-radius:18px; }
+.capsule-frost-edge {
+  position:absolute;
+  z-index:1;
+  inset:0;
+  border-radius:inherit;
+  padding:5px;
+  pointer-events:none;
+  /* Static grain is confined to the rim so it never reduces text contrast. */
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.84' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='.4' filter='url(%23g)'/%3E%3C/svg%3E");
+  opacity:.3;
+  mix-blend-mode:soft-light;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}
+.capsule-corner-accents {
+  position:absolute;
+  z-index:3;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+}
+.capsule-corner-accents::before,.capsule-corner-accents::after {
+  position:absolute;
+  inset:0;
+  content:"";
+  border:1.25px solid;
+  border-radius:inherit;
+}
+/* Short, static etched inlays follow the real rounded outline. */
+.capsule-corner-accents::before {
+  border-color:#9DDDEDB8;
+  clip-path:inset(0 calc(100% - 29px) calc(100% - 14px) 0);
+}
+.capsule-corner-accents::after {
+  border-color:#B4A0E7B0;
+  clip-path:inset(calc(100% - 14px) 0 0 calc(100% - 29px));
+}
+.capsule-heading {
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  height:38px;
+  min-height:38px;
+  padding:0 11px;
+  color:inherit;
+  text-align:left;
+}
+.capsule-title {
+  flex:1;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:12px;
+  font-weight:500;
+  line-height:20px;
+  letter-spacing:.025em;
+}
+.capsule-brand-seat {
+  display:grid;
+  place-items:center;
+  width:24px;
+  height:24px;
+  flex-shrink:0;
+  border:1px solid color-mix(in srgb,currentColor 9%,transparent);
+  border-radius:8px;
+  background:#ffffff14;
+  box-shadow:inset 0 1px 0 #ffffff35;
+}
+.capsule-brand-mark { display:block; width:18px; height:21px; object-fit:contain; pointer-events:none; }
+.capsule-open-arrow { display:flex; align-items:center; flex-shrink:0; opacity:.66; }
+.capsule-card[data-edge="right"] .capsule-open-arrow { transform:rotate(180deg); }
+.capsule-card[data-edge="top"] .capsule-open-arrow { transform:rotate(90deg); }
+.capsule-card[data-edge="bottom"] .capsule-open-arrow { transform:rotate(-90deg); }
+.capsule-heading:hover .capsule-open-arrow { opacity:1; }
+.capsule-card button:focus-visible { outline:2px solid currentColor; outline-offset:-4px; border-radius:12px; }
+.capsule-card button:disabled { opacity:.7; cursor:progress; }
+.capsule-edge-mark {
+  position:absolute;
+  z-index:3;
+  pointer-events:none;
+  opacity:.3;
+}
+.capsule-card[data-edge="left"] .capsule-edge-mark,.capsule-card[data-edge="right"] .capsule-edge-mark { top:14px; width:3px; height:10px; background:repeating-linear-gradient(0deg,currentColor 0 1px,transparent 1px 4px); }
+.capsule-card[data-edge="left"] .capsule-edge-mark { left:2px; }
+.capsule-card[data-edge="right"] .capsule-edge-mark { right:2px; }
+.capsule-card[data-edge="top"] .capsule-edge-mark,.capsule-card[data-edge="bottom"] .capsule-edge-mark { left:calc(50% - 5px); width:10px; height:3px; background:repeating-linear-gradient(90deg,currentColor 0 1px,transparent 1px 4px); }
+.capsule-card[data-edge="top"] .capsule-edge-mark { top:2px; }
+.capsule-card[data-edge="bottom"] .capsule-edge-mark { bottom:2px; }
+.capsule-preview {
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  min-height:0;
+  border-top:1px solid color-mix(in srgb,currentColor 10%,transparent);
+}
+.capsule-preview-text {
+  display:block;
+  flex:1;
+  width:100%;
+  min-height:0;
+  overflow:auto;
+  margin:0;
+  padding:12px 16px;
+  color:inherit;
+  text-align:left;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  font-size:12.5px;
+  font-weight:400;
+  line-height:1.75;
+  scrollbar-width:thin;
+  scrollbar-color:color-mix(in srgb,currentColor 26%,transparent) transparent;
+}
+.capsule-preview-text.is-empty { font-size:12.5px; }
+.capsule-preview-footer {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  min-height:36px;
+  padding:5px 12px 7px 16px;
+  border-top:1px solid color-mix(in srgb,currentColor 8%,transparent);
+  font-size:10.5px;
+  line-height:1.4;
+}
+.capsule-preview-footer > span {
+  flex:1;
+  min-width:0;
+  display:-webkit-box;
+  overflow:hidden;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+.capsule-edit-button {
+  display:flex;
+  align-items:center;
+  flex-shrink:0;
+  gap:4px;
+  min-height:25px;
+  padding:4px 7px;
+  border-radius:7px;
+  border:1px solid color-mix(in srgb,currentColor 15%,transparent);
+  box-shadow:inset 0 1px 0 #ffffff30;
+  font-size:10.5px;
+}
+.capsule-edit-button:hover { border-color:color-mix(in srgb,currentColor 35%,transparent); }
+.capsule-card.is-preview[data-edge="bottom"] { flex-direction:column-reverse; }
+.capsule-card.is-preview[data-edge="bottom"] .capsule-preview { border-top:0; border-bottom:1px solid color-mix(in srgb,currentColor 13%,transparent); }
+.capsule-sr-only {
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip-path:inset(50%);
+  white-space:nowrap;
+}

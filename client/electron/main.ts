@@ -14,6 +14,8 @@ import { migrateLegacyFile } from './migration';
 import { resizedFrame, visibleFrame } from './geometry';
 import { createAIService, publicAIError } from './ai';
 import { AICredentialStore } from './ai-credentials';
+import { CapsuleStore } from './capsule-store';
+import { capsuleBounds, dockAnchor, findDockEdge, resolveCapsuleBounds, type DockPlacement } from './capsule-geometry';
 import type { AICall } from '../src/shared/types';
 
 app.setName('雾笺');
@@ -22,6 +24,13 @@ const dataDirectory = process.env.MIST_DATA_DIR
   : join(app.getPath('appData'), 'MistNotesDesktop');
 app.setPath('userData', dataDirectory);
 const store = new NotebookStore(dataDirectory);
+const capsuleStore = new CapsuleStore(dataDirectory);
+let capsuleState: { enabled: boolean; placements: Record<string, DockPlacement> } = { enabled: true, placements: {} };
+let capsuleLoadError: string | undefined;
+const capsules = new Map<string, BrowserWindow>();
+const previewing = new Set<string>();
+const folding = new Set<string>();
+const dragSessions = new Map<number, { start: Electron.Rectangle; initial: PointerPosition; moved: boolean }>();
 const aiCredentials = new AICredentialStore(dataDirectory, safeStorage);
 const ai = createAIService({ getKey: () => aiCredentials.readKey() });
 const aiJobs = new Map<number, AbortController>();
@@ -61,7 +70,7 @@ function requireNote(id: unknown): Note {
   return note;
 }
 function noteForWindow(window: BrowserWindow): Note {
-  const entry = [...windows].find(([, value]) => value === window);
+  const entry = [...windows, ...capsules].find(([, value]) => value === window);
   if (!entry) throw new Error('窗口已经关闭。');
   return requireNote(entry[0]);
 }
@@ -71,13 +80,17 @@ function loginEnabled(): boolean {
   return app.getLoginItemSettings(process.platform === 'win32' ? { path: loginPath() } : undefined).openAtLogin;
 }
 function stateFor(window: BrowserWindow): AppState {
+  const id = noteForWindow(window).id;
   return {
-    notebook, noteId: noteForWindow(window).id, platform: process.platform,
+    notebook, noteId: id, platform: process.platform,
     version: app.getVersion(), loginEnabled: loginEnabled(), migrationMessage,
+    windowMode: capsules.get(id) === window ? (previewing.has(id) ? 'preview' : 'capsule') : 'note',
+    capsuleEdge: capsuleState.placements[id]?.edge,
+    capsuleEnabled: capsuleState.enabled,
   };
 }
 function broadcast(): void {
-  for (const window of windows.values()) {
+  for (const window of [...windows.values(), ...capsules.values()]) {
     if (!window.isDestroyed()) window.webContents.send('mist:state', stateFor(window));
   }
 }
@@ -136,6 +149,7 @@ function showNote(id: string): void {
   if (!note.visible) replaceNote({ ...note, visible: true });
   const existing = windows.get(id);
   if (existing && !existing.isDestroyed()) {
+    if (capsuleState.placements[id]) restoreCapsule(id);
     if (existing.isMinimized()) existing.restore();
     existing.show();
     existing.focus();
@@ -155,6 +169,8 @@ function setPinned(id: string, pinned: unknown): void {
 }
 function archiveNote(id: string): void {
   saveFrame(id);
+  removePlacement(id);
+  destroyCapsule(id);
   replaceNote({ ...requireNote(id), archived: true, visible: false, updatedAt: new Date().toISOString() });
   const window = windows.get(id);
   if (window) {
@@ -179,6 +195,166 @@ function setLogin(enabled: unknown): boolean {
   broadcast();
   rebuildMenus();
   return current;
+}
+
+function saveCapsules(next: typeof capsuleState): void {
+  if (capsuleLoadError) throw new Error(`胶囊布局暂不可用：${capsuleLoadError}`);
+  capsuleStore.save(next);
+  capsuleState = next;
+}
+function removePlacement(id: string): void {
+  if (!capsuleState.placements[id]) return;
+  const placements = { ...capsuleState.placements };
+  delete placements[id];
+  saveCapsules({ ...capsuleState, placements });
+}
+function destroyCapsule(id: string): void {
+  const capsule = capsules.get(id);
+  capsules.delete(id);
+  previewing.delete(id);
+  if (capsule && !capsule.isDestroyed()) capsule.destroy();
+}
+function reflowCapsules(): void {
+  const displays = screen.getAllDisplays();
+  const occupied = new Map<number, Electron.Rectangle[]>();
+  const placements = { ...capsuleState.placements };
+  let changed = false;
+  for (const [id, placement] of Object.entries(placements)) {
+    const capsule = capsules.get(id);
+    if (!capsule || capsule.isDestroyed()) continue;
+    let display = displays.find(item => item.id === placement.displayId);
+    if (!display) {
+      const frame = requireNote(id).frame;
+      display = frame ? screen.getDisplayMatching(frame) : screen.getPrimaryDisplay();
+      placements[id] = { ...placement, displayId: display.id };
+      changed = true;
+    }
+    const other = occupied.get(display.id) ?? [];
+    const bounds = resolveCapsuleBounds(placement, display.workArea, other);
+    other.push(bounds);
+    occupied.set(display.id, other);
+    const actual = { ...placement, anchor: dockAnchor(bounds, display.workArea, placement.edge) };
+    capsule.setBounds(previewing.has(id) ? capsuleBounds(actual, display.workArea, true) : bounds);
+  }
+  if (changed) saveCapsules({ ...capsuleState, placements });
+}
+function restoreCapsule(id: string, focus = true): void {
+  let layoutError: unknown;
+  try { removePlacement(id); }
+  catch (error) {
+    // Recover access to the editor even when the separate presentation file cannot be written.
+    const placements = { ...capsuleState.placements };
+    delete placements[id];
+    capsuleState = { ...capsuleState, placements };
+    layoutError = error;
+  }
+  destroyCapsule(id);
+  const window = windows.get(id);
+  if (!window || window.isDestroyed()) return;
+  const note = requireNote(id);
+  const frame = note.frame ?? window.getBounds();
+  const bounds = visibleFrame(frame, screen.getDisplayMatching(frame).workArea);
+  window.setBounds(bounds);
+  if (window.isMinimized()) window.restore();
+  if (focus) { window.show(); window.focus(); }
+  else window.showInactive();
+  reflowCapsules();
+  broadcast();
+  if (layoutError) void dialog.showMessageBox(window, {
+    type: 'warning', title: '雾笺', message: '便签已展开，胶囊布局暂未保存。',
+    detail: errorMessage(layoutError), buttons: ['好'],
+  });
+}
+function createCapsule(note: Note): void {
+  if (capsules.has(note.id) || !capsuleState.placements[note.id]) return;
+  const placement = capsuleState.placements[note.id];
+  const display = screen.getAllDisplays().find(item => item.id === placement.displayId)
+    ?? (note.frame ? screen.getDisplayMatching(note.frame) : screen.getPrimaryDisplay());
+  const capsule = new BrowserWindow({
+    ...capsuleBounds(placement, display.workArea), show: false,
+    title: `${note.title || '雾笺'} · 胶囊`, frame: false, transparent: true,
+    backgroundColor: '#00000000', resizable: false, hasShadow: false,
+    minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true,
+    alwaysOnTop: true, acceptFirstMouse: true,
+    webPreferences: {
+      preload: join(__dirname, 'preload.cjs'), nodeIntegration: false,
+      contextIsolation: true, sandbox: true, spellcheck: false,
+      webSecurity: true, allowRunningInsecureContent: false,
+    },
+  });
+  capsules.set(note.id, capsule);
+  capsule.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  capsule.webContents.on('will-navigate', event => event.preventDefault());
+  capsule.webContents.on('will-attach-webview', event => event.preventDefault());
+  capsule.webContents.on('did-fail-load', () => {
+    if (capsules.get(note.id) === capsule) restoreCapsule(note.id);
+  });
+  capsule.webContents.on('render-process-gone', () => {
+    if (!quitting && capsules.get(note.id) === capsule) restoreCapsule(note.id);
+  });
+  capsule.once('ready-to-show', () => {
+    if (!capsuleState.placements[note.id] || capsules.get(note.id) !== capsule) return;
+    reflowCapsules();
+    capsule.showInactive();
+    windows.get(note.id)?.hide();
+  });
+  capsule.on('closed', () => {
+    if (capsules.get(note.id) !== capsule) return;
+    capsules.delete(note.id);
+    previewing.delete(note.id);
+    if (!quitting) { try { restoreCapsule(note.id); } catch (error) { showError(error); } }
+  });
+  if (devURL) void capsule.loadURL(devURL);
+  else void capsule.loadFile(join(appRoot, 'dist', 'index.html'));
+}
+async function dockNote(window: BrowserWindow): Promise<void> {
+  const note = noteForWindow(window);
+  if (!capsuleState.enabled || capsuleState.placements[note.id] || folding.has(note.id)
+    || !window.isVisible() || window.isMaximized() || window.isFullScreen()) return;
+  const frame = window.getBounds();
+  const display = screen.getDisplayMatching(frame);
+  const edge = findDockEdge(frame, display.workArea);
+  if (!edge) return;
+  folding.add(note.id);
+  try {
+    // Keep the editor mounted. A failed or pending save must never disappear into a capsule.
+    await requestRendererFlush(window);
+    const current = requireNote(note.id);
+    if (window.isDestroyed() || !window.isVisible() || !capsuleState.enabled || !current.visible || current.archived || dragSessions.has(window.id)
+      || JSON.stringify(window.getBounds()) !== JSON.stringify(frame)) return;
+    saveFrame(note.id);
+    saveCapsules({ ...capsuleState, placements: {
+      ...capsuleState.placements,
+      [note.id]: { edge, displayId: display.id, anchor: dockAnchor(frame, display.workArea, edge) },
+    } });
+    createCapsule(requireNote(note.id));
+    broadcast();
+  } finally { folding.delete(note.id); }
+}
+function setCapsuleEnabled(enabled: unknown): void {
+  if (typeof enabled !== 'boolean') throw new Error('胶囊设置格式不正确。');
+  const ids = Object.keys(capsuleState.placements);
+  let layoutError: unknown;
+  const next = { enabled, placements: enabled ? capsuleState.placements : {} };
+  try { saveCapsules(next); }
+  catch (error) {
+    if (enabled) throw error;
+    capsuleState = next;
+    layoutError = error;
+  }
+  if (!enabled) for (const id of ids) {
+    destroyCapsule(id);
+    const window = windows.get(id);
+    if (window && !window.isDestroyed()) {
+      window.setBounds(visibleFrame(window.getBounds(), screen.getDisplayMatching(window.getBounds()).workArea));
+      window.showInactive();
+    }
+  }
+  broadcast();
+  if (layoutError) void dialog.showMessageBox({
+    type: 'warning', title: '雾笺', message: '胶囊已关闭，便签已展开；设置暂未保存。',
+    detail: errorMessage(layoutError), buttons: ['好'],
+  });
 }
 function createWindow(note: Note): void {
   const display = note.frame ? screen.getDisplayMatching(note.frame) : screen.getPrimaryDisplay();
@@ -217,7 +393,9 @@ function createWindow(note: Note): void {
       buttons: ['重新打开'], noLink: true,
     }).then(() => { if (!window.isDestroyed()) window.reload(); }).catch(showError);
   });
-  window.once('ready-to-show', () => window.show());
+  window.once('ready-to-show', () => {
+    if (!capsuleState.enabled || !capsuleState.placements[note.id]) window.show();
+  });
   window.on('resize', () => scheduleFrame(note.id));
   window.on('move', () => scheduleFrame(note.id));
   window.on('close', (event) => {
@@ -229,6 +407,8 @@ function createWindow(note: Note): void {
     requestRendererFlush(window).then(() => {
       if (window.isDestroyed()) return;
       saveFrame(note.id);
+      removePlacement(note.id);
+      destroyCapsule(note.id);
       replaceNote({ ...requireNote(note.id), visible: false });
       window.hide();
     }).catch(showError).finally(() => closingWindows.delete(window.id));
@@ -238,9 +418,12 @@ function createWindow(note: Note): void {
     aiJobs.delete(window.id);
     if (windows.get(note.id) === window) windows.delete(note.id);
     resizeSessions.delete(window.id);
+    dragSessions.delete(window.id);
+    destroyCapsule(note.id);
   });
   if (devURL) void window.loadURL(devURL);
   else void window.loadFile(join(appRoot, 'dist', 'index.html'));
+  if (capsuleState.enabled && capsuleState.placements[note.id]) createCapsule(note);
 }
 async function exportBackup(window?: BrowserWindow): Promise<boolean> {
   flushFrames();
@@ -380,7 +563,7 @@ function createTray(): void {
 }
 function senderWindow(event: IpcMainInvokeEvent): BrowserWindow {
   const window = BrowserWindow.fromWebContents(event.sender);
-  if (!window || event.senderFrame !== event.sender.mainFrame || ![...windows.values()].includes(window)) throw new Error('此窗口无权访问便签数据。');
+  if (!window || event.senderFrame !== event.sender.mainFrame || ![...windows.values(), ...capsules.values()].includes(window)) throw new Error('此窗口无权访问便签数据。');
   const url = event.senderFrame.url;
   if (devURL) {
     if (new URL(url).origin !== new URL(devURL).origin) throw new Error('页面来源无效。');
@@ -409,6 +592,9 @@ function registerIPC(): void {
   const handle = (name: string, callback: (window: BrowserWindow, ...args: any[]) => unknown) => {
     ipcMain.handle(`mist:${name}`, (event, ...args) => {
       const window = senderWindow(event);
+      if ([...capsules.values()].includes(window) && !['get-state', 'capsule-preview', 'capsule-restore'].includes(name)) {
+        throw new Error('胶囊预览为只读，请先展开便签。');
+      }
       return callback(window, ...args);
     });
   };
@@ -443,6 +629,37 @@ function registerIPC(): void {
     resizeSessions.delete(window.id);
     saveFrame(noteForWindow(window).id);
   });
+  handle('drag-start', (window, position: unknown) => {
+    dragSessions.set(window.id, { start: window.getBounds(), initial: pointer(position), moved: false });
+  });
+  handle('drag-move', (window, position: unknown) => {
+    const drag = dragSessions.get(window.id);
+    if (!drag) return;
+    const point = pointer(position);
+    const dx = point.screenX - drag.initial.screenX, dy = point.screenY - drag.initial.screenY;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    drag.moved = true;
+    window.setPosition(Math.round(drag.start.x + dx), Math.round(drag.start.y + dy));
+  });
+  handle('drag-end', async (window, cancelled: unknown = false) => {
+    if (typeof cancelled !== 'boolean') throw new Error('拖动状态无效。');
+    const drag = dragSessions.get(window.id);
+    dragSessions.delete(window.id);
+    if (!drag?.moved) return;
+    if (cancelled) window.setBounds(drag.start);
+    saveFrame(noteForWindow(window).id);
+    if (!cancelled) await dockNote(window);
+  });
+  handle('capsule-preview', (window, expanded: unknown) => {
+    if (typeof expanded !== 'boolean') throw new Error('预览状态格式不正确。');
+    const id = noteForWindow(window).id;
+    if (capsules.get(id) !== window) throw new Error('请从胶囊打开预览。');
+    if (expanded) previewing.add(id); else previewing.delete(id);
+    reflowCapsules();
+    window.webContents.send('mist:state', stateFor(window));
+  });
+  handle('capsule-restore', window => restoreCapsule(noteForWindow(window).id));
+  handle('capsule-enabled', (_window, enabled: unknown) => setCapsuleEnabled(enabled));
   handle('minimize', (window) => window.minimize());
   handle('close', (window) => window.close());
   handle('set-login', (_window, enabled: unknown) => setLogin(enabled));
@@ -485,17 +702,30 @@ else {
       if (migration) { loaded = migration.notebook; migrationMessage = migration.message; }
     }
     notebook = loaded ?? emptyNotebook();
+    try { capsuleState = capsuleStore.load(); }
+    catch (error) {
+      capsuleLoadError = errorMessage(error);
+      capsuleState = { enabled: false, placements: {} };
+    }
     if (notebook.notes.length === 0) notebook.notes.push(createBlankNote());
     store.save(notebook);
     registerIPC();
     createTray();
     rebuildMenus();
+    const reflow = () => { try { reflowCapsules(); broadcast(); } catch (error) { showError(error); } };
+    screen.on('display-removed', reflow);
+    screen.on('display-added', reflow);
+    screen.on('display-metrics-changed', reflow);
     const visible = notebook.notes.filter((note) => note.visible && !note.archived);
     if (visible.length) visible.forEach(createWindow);
     else {
       const first = notebook.notes.find((note) => !note.archived);
       if (first) showNote(first.id);
     }
+    if (capsuleLoadError) void dialog.showMessageBox({
+      type: 'warning', title: '雾笺', message: '胶囊布局暂不可用，便签已以完整窗口打开。',
+      detail: capsuleLoadError, buttons: ['好'],
+    });
     app.on('activate', () => {
       const first = notebook.notes.find((note) => !note.archived);
       if (first) showNote(first.id); else createNote();

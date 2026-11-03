@@ -1,7 +1,7 @@
 {
   "name": "mist-notes-desktop",
   "productName": "雾笺",
-  "version": "2.1.0-beta.6",
+  "version": "2.1.0-beta.7",
   "description": "Local-first desktop sticky notes with accessible animated gradients and optional one-click AI organization",
   "private": true,
   "author": "雾笺",

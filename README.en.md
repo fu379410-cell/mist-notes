@@ -4,19 +4,20 @@ Local-first desktop sticky notes with resizable windows, precise typography, acc
 
 [简体中文](README.md) · [Architecture](docs/ARCHITECTURE.md) · [Build guide](docs/BUILDING.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
-> Version `2.1.0-beta.6`. On 2026-10-26, the owner approved the MIT license and public redistribution of the listed project-owned code, six runtime icons, and synthetic-content screenshot. Repository: [fu379410-cell/mist-notes](https://github.com/fu379410-cell/mist-notes). Check [GitHub Actions](https://github.com/fu379410-cell/mist-notes/actions) for actual CI results.
+> Development candidate `2.1.0-beta.7` adds edge capsules. On 2026-10-26, the owner approved the MIT license and public redistribution of the listed project-owned code, six runtime icons, and synthetic-content screenshot. Repository: [fu379410-cell/mist-notes](https://github.com/fu379410-cell/mist-notes). Check [GitHub Actions](https://github.com/fu379410-cell/mist-notes/actions) for actual CI results.
 
 ## Actual client screenshot
 
 ![macOS client with synthetic demonstration content](docs/screenshots/macos-demo.png)
 
-Captured from the running candidate on macOS using synthetic text only. This still image does not show color animation; the sharing indicator belongs to the macOS capture environment.
+Captured from `2.1.0-beta.6` on macOS using synthetic text only; it does not show the new beta.7 capsule UI. This still image does not show color animation; the sharing indicator belongs to the macOS capture environment.
 
 ## Purpose and features
 
 Mist Notes provides small, readable windows for personal thoughts and working drafts. Notes remain on the local computer. AI is optional and runs only after an explicit click.
 
 - Resize each note from its edges or corner; preserve window geometry, pin notes, and manage login startup.
+- Drag a note by its header and release near any work-area edge to collapse it into a capsule. Hover for a read-only preview and click to restore editing without remounting the editor or discarding the current session's undo history. Capsules avoid one another along the edge; their layout and global switch are saved separately on this computer. See the [capsule guide](docs/CAPSULES.md).
 - Drag a 1–200 font-size slider for the title, whole body, or selected text, with one undo step per completed gesture.
 - Choose from 240 presets or create a two-to-four-stop gradient; search, favorite, and revisit palettes.
 - Slowly crossfade full-window linear gradients without localized light blobs. Each transition takes about 12 seconds; reduced-motion preferences slow the cycle.

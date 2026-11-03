@@ -13,6 +13,7 @@ import { ensureDynamicReadableTheme } from './shared/dynamic-gradient';
 import { FontPanel } from './FontPanel';
 import { ThemePanel } from './ThemePanel';
 import { Icon } from './Icons';
+import { CapsuleWindow } from './CapsuleWindow';
 import logoUrl from '../resources/brand-mark.png';
 
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
   useEffect(() => { window.mist.getState().then(setInitial).catch(e => setFailure(String(e.message || e))); }, []);
   if (failure) return <main className="startup-error"><h1>无法打开便签</h1><p>{failure}</p><button onClick={() => location.reload()}>重试</button></main>;
   if (!initial) return <main className="startup-error"><img src={logoUrl} width={48}/><p>正在打开雾笺…</p></main>;
+  if (initial.windowMode === 'capsule' || initial.windowMode === 'preview') return <CapsuleWindow initial={initial}/>;
   const note = initial.notebook.notes.find(n => n.id === initial.noteId);
   return note ? <NoteWindow key={note.id} initial={initial} initialNote={note}/> : <main className="startup-error"><p>这张便签已归档</p><button onClick={() => window.mist.createNote()}>新建便签</button></main>;
 }
@@ -66,7 +68,11 @@ function NoteWindow({ initial, initialNote }: { initial: AppState; initialNote: 
   }), []);
   useEffect(() => window.mist.onBeforeClose(async () => {
     aiRequest.current?.abort();
-    await queue.current;
+    for (;;) {
+      const saving = queue.current;
+      await saving;
+      if (saving === queue.current) break;
+    }
     if (saveFailed.current) throw new Error('仍有内容未成功保存，请先重试保存。');
   }), []);
   useEffect(() => () => { aiRequest.current?.abort(); void window.mist.aiCancel().catch(() => {}); }, []);
@@ -123,6 +129,45 @@ function NoteWindow({ initial, initialNote }: { initial: AppState; initialNote: 
   }, [panel]);
   const pointer = (event: React.PointerEvent) => ({ screenX: window.screenX + event.clientX, screenY: window.screenY + event.clientY });
   const resize = useRef(false);
+  const drag = useRef(false);
+  const dragQueue = useRef(Promise.resolve());
+  const dragFrame = useRef<number | null>(null);
+  const dragPosition = useRef({ screenX: 0, screenY: 0 });
+  const enqueueDrag = (work: () => Promise<void>) => {
+    dragQueue.current = dragQueue.current.then(work).catch(e => { setError(String(e.message || e)); });
+  };
+  const startDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = true;
+    const position = { screenX: event.screenX, screenY: event.screenY };
+    dragPosition.current = position;
+    enqueueDrag(() => window.mist.dragStart(position));
+  };
+  const moveDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (!drag.current) return;
+    dragPosition.current = { screenX: event.screenX, screenY: event.screenY };
+    if (dragFrame.current !== null) return;
+    dragFrame.current = requestAnimationFrame(() => {
+      dragFrame.current = null;
+      const position = dragPosition.current;
+      if (drag.current) enqueueDrag(() => window.mist.dragMove(position));
+    });
+  };
+  const endDrag = (event: React.PointerEvent<HTMLElement>, cancelled = false) => {
+    if (!drag.current) return;
+    drag.current = false;
+    const position = { screenX: event.screenX, screenY: event.screenY };
+    if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+    dragFrame.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    enqueueDrag(async () => { await window.mist.dragMove(position); await window.mist.dragEnd(cancelled); });
+  };
+  const dragProps = { onPointerDown: startDrag, onPointerMove: moveDrag,
+    onPointerUp: (event: React.PointerEvent<HTMLElement>) => endDrag(event),
+    onPointerCancel: (event: React.PointerEvent<HTMLElement>) => endDrag(event, true),
+    onLostPointerCapture: (event: React.PointerEvent<HTMLElement>) => endDrag(event, true) };
   const afterSaved = async (fn: () => Promise<unknown>) => {
     await queue.current;
     if (saveFailed.current) throw new Error('仍有内容未成功保存，请先重试保存。');
@@ -179,11 +224,11 @@ function NoteWindow({ initial, initialNote }: { initial: AppState; initialNote: 
   } as CSSProperties}>
     <DynamicBackground theme={theme}/>
     <div className="window-bar">
-      <span className={`window-drag ${state.platform === 'darwin' ? 'mac' : ''}`}>雾笺</span>
+      <span {...dragProps} className={`window-drag ${state.platform === 'darwin' ? 'mac' : ''}`} title="拖动便签，靠近屏幕边缘松手可收为胶囊">雾笺</span>
       {state.platform !== 'darwin' && <div className="window-controls"><button aria-label="最小化" onClick={() => run(window.mist.minimize())}><Icon name="minus" size={14}/></button><button aria-label="收起窗口" onClick={() => run(afterSaved(() => window.mist.close()))}><Icon name="close" size={14}/></button></div>}
     </div>
     <header className="note-header">
-      <div className="brand"><img src={logoUrl} alt=""/><span>雾笺</span><small>随手记</small></div>
+      <div {...dragProps} className="brand" title="拖到屏幕边缘收为胶囊"><img src={logoUrl} alt="" draggable={false}/><span>雾笺</span><small>随手记</small></div>
       <div className="tools">
         <button className={`icon-button aa ${panel === 'font' ? 'active' : ''}`} aria-label="调整字号" title="拖动调整字号 ⌘T" onMouseDown={e => e.preventDefault()} onClick={() => setPanel(p => p === 'font' ? null : 'font')}>A<span>A</span></button>
         <button className="icon-button" aria-label="新建便签" title="新建便签" onClick={() => run(window.mist.createNote())}><Icon name="plus"/></button>
@@ -221,6 +266,7 @@ function NoteWindow({ initial, initialNote }: { initial: AppState; initialNote: 
         {state.notebook.notes.some(n => n.archived) && <><div className="menu-section-label">已归档 · 点击恢复</div>{state.notebook.notes.filter(n => n.archived).map(n => <button className="menu-item" key={n.id} onClick={() => run(window.mist.restoreNote(n.id))}><Icon name="restore"/><span>{n.title || '未命名便签'}</span></button>)}</>}
         <div className="menu-divider"/>
         <div className="menu-section-label">本机设置</div>
+        <label className="menu-item">拖到边缘自动收为胶囊<input type="checkbox" checked={state.capsuleEnabled ?? true} onChange={e => run(window.mist.setCapsuleEnabled(e.target.checked))}/></label>
         <button className="menu-item" disabled={aiBusy} aria-expanded={aiSettings} onClick={() => { setAISettings(value => !value); setAIKeyPopover(false); }}>AI 密钥设置</button>
         {aiSettings && <AIKeySettings onClose={() => setAISettings(false)} onSaved={() => { setAISettings(false); setAIFeedback('密钥已在本机保存'); }}/ >}
         <label className="menu-item">登录时自动打开<input type="checkbox" checked={login} onChange={e => run(window.mist.setLogin(e.target.checked).then(setLogin))}/></label>

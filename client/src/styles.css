@@ -10,13 +10,14 @@ input { min-width:0; }
 .note-shell { position:relative; display:flex; flex-direction:column; height:100%; padding:0 23px; isolation:isolate; border:1px solid #ffffff40; overflow:hidden; }
 .reading-layer { position:absolute; inset:0; z-index:-1; pointer-events:none; }
 .window-bar { height:31px; flex-shrink:0; display:flex; align-items:center; user-select:none; }
-.window-drag { -webkit-app-region:drag; flex:1; height:100%; color:transparent; font-size:11px; }
+.window-drag { -webkit-app-region:no-drag; flex:1; height:100%; color:transparent; font-size:11px; touch-action:none; cursor:grab; }
+.window-drag:active,.brand:active { cursor:grabbing; }
 .window-drag.mac { margin-left:60px; }
 .window-controls { display:flex; height:26px; margin-right:-18px; }
 .window-controls button { width:32px; opacity:.65; display:grid; place-items:center; border-radius:5px; }
 .window-controls button:hover { background:#ffffff50; opacity:1; }
 .note-header { display:flex; justify-content:space-between; align-items:center; gap:3px; flex-shrink:0; height:38px; }
-.brand { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:500; white-space:nowrap; user-select:none; -webkit-app-region:drag; flex:1; }
+.brand { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:500; white-space:nowrap; user-select:none; -webkit-app-region:no-drag; flex:1; touch-action:none; cursor:grab; }
 .brand img { width:22px; height:22px; object-fit:contain; display:block; flex-shrink:0; }
 .brand > span { letter-spacing:.045em; opacity:.82; }
 .brand small { font-weight:400; margin-left:5px; opacity:.55; font-size:10px; }
