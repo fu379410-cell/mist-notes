@@ -8,6 +8,7 @@
 - 本机安装至用户 Applications 目录并启动新版。升级前正常退出旧客户端、保留旧副本并复制应用数据备份；启动后对比便签完整 JSON 和加密凭据文件，均保持不变。私人数据及路径不进入公开验证材料。
 - 仅完成本机 Mac arm64 验收。Windows、Intel Mac、真实多屏拔插和混合缩放比例仍待实机验证；安装包未公开发布。源码更新及三平台 CI 的实际执行状态见仓库 [GitHub Actions](https://github.com/fu379410-cell/mist-notes/actions)。
 - 原生系统菜单导入导出的已知保存队列边界仍按 [KNOWN_ISSUES.md](KNOWN_ISSUES.md) 记录；胶囊收起自身会等待当前编辑器的保存队列。
+- GitHub 同步期间按新公告更新两项开发传递依赖补丁（`follow-redirects` 1.16.2、`joi` 18.3.1），从锁文件重新 `npm ci` 后，68 项测试、构建和许可核对通过；另以本机合成 HTTP 服务验证 `wait-on` 就绪与超时两条路径。官方 registry 审计结果为 0 critical、0 high、15 moderate；剩余记录及上游公告见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。
 
 以下保留此前 beta.6 开源准备的历史记录。
 

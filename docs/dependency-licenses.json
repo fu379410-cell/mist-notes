@@ -1915,7 +1915,7 @@
     },
     {
       "name": "follow-redirects",
-      "version": "1.16.1",
+      "version": "1.16.2",
       "license": "MIT",
       "development": true,
       "optional": false,
@@ -2307,7 +2307,7 @@
     },
     {
       "name": "joi",
-      "version": "18.3.0",
+      "version": "18.3.1",
       "license": "BSD-3-Clause",
       "development": true,
       "optional": false,
